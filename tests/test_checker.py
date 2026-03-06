@@ -62,15 +62,15 @@ def test_price_one_dollar_above_threshold_is_excluded():
     assert deals == []
 
 
-def test_results_sorted_price_ascending():
+def test_results_sorted_by_date_ascending():
     flights = [
         _flight(130.0, depart="2026-04-17", ret="2026-04-19"),
         _flight(100.0, depart="2026-04-10", ret="2026-04-12"),
         _flight(145.0, depart="2026-04-24", ret="2026-04-26"),
     ]
     deals = find_deals(flights, threshold=THRESHOLD)
-    prices = [d["price"] for d in deals]
-    assert prices == sorted(prices)
+    dates = [d["depart_date"] for d in deals]
+    assert dates == sorted(dates)
 
 
 def test_min_price_exactly_at_boundary_is_included():

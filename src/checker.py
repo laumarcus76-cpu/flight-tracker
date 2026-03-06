@@ -5,7 +5,7 @@ Filters raw flight results down to actionable deals:
 - removes prices above the threshold
 - removes suspiciously low prices (bad data)
 - deduplicates by (depart_date, return_date), keeping lowest price
-- sorts by price ascending
+- sorts by departure date ascending (earliest first)
 """
 
 
@@ -23,7 +23,7 @@ def find_deals(
         min_price: min price in USD; below this is treated as bad data
 
     Returns:
-        Filtered, deduplicated, price-ascending list of flight dicts.
+        Filtered, deduplicated, date-ascending list of flight dicts.
     """
     # Deduplicate by (depart_date, return_date), keeping the lowest price per pair
     best: dict[tuple[str, str], dict] = {}
@@ -35,4 +35,4 @@ def find_deals(
         if key not in best or price < best[key]["price"]:
             best[key] = flight
 
-    return sorted(best.values(), key=lambda f: f["price"])
+    return sorted(best.values(), key=lambda f: (f["depart_date"], f["return_date"]))

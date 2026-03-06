@@ -437,30 +437,30 @@ for the cron schedule.
 
 ### TICKET-008 — Documentation
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Complexity:** Low
 - **Depends on:** All other tickets
 
 **Tasks**
 
-- [ ] Write `README.md` covering:
-  - [ ] **What it does** — 2-3 sentence description
-  - [ ] **Prerequisites** — Python 3.11+, GitHub account, SerpAPI account, Resend account
-  - [ ] **Account setup** — SerpAPI (key location, free tier limits) and Resend (sender verification, key)
-  - [ ] **Configuration** — copy `config.example.yaml` to `config.yaml`, edit routes/threshold/scan window
-  - [ ] **SerpAPI call budget** — explain 250/month limit and why `scan_months_ahead: 3` is the safe default
-  - [ ] **GitHub Secrets setup** — exact names: `SERPAPI_KEY`, `RESEND_API_KEY`, `ALERT_EMAIL`
-  - [ ] **Running locally** — `pip install -r requirements.txt` → `python main.py --test`
-  - [ ] **Verifying the workflow** — `workflow_dispatch`, where to check logs
-  - [ ] **Cron schedule** — explain `0 13 1,15 * *`, link to crontab.guru
-  - [ ] **Troubleshooting** — bad API key, Resend sender not verified, no flights found, exceeding SerpAPI limit
+- [x] Write `README.md` covering:
+  - [x] **What it does** — 2-3 sentence description
+  - [x] **Prerequisites** — Python 3.11+, GitHub account, SerpAPI account, Resend account
+  - [x] **Account setup** — SerpAPI (key location, free tier limits) and Resend (sender verification, key)
+  - [x] **Configuration** — copy `config.example.yaml` to `config.yaml`, edit routes/threshold/scan window
+  - [x] **SerpAPI call budget** — explain 250/month limit and why `scan_months_ahead: 3` is the safe default
+  - [x] **GitHub Secrets setup** — exact names: `SERPAPI_KEY`, `RESEND_API_KEY`, `ALERT_EMAIL`
+  - [x] **Running locally** — `pip install -r requirements.txt` → `python main.py --test`
+  - [x] **Verifying the workflow** — `workflow_dispatch`, where to check logs
+  - [x] **Cron schedule** — explain `0 13 1,15 * *`, link to crontab.guru
+  - [x] **Troubleshooting** — bad API key, Resend sender not verified, no flights found, exceeding SerpAPI limit
 
 **Acceptance Criteria**
 
-- [ ] All three secret names in README exactly match the workflow YAML
-- [ ] README explains the bi-weekly schedule and call budget clearly
-- [ ] Troubleshooting covers at least 3 failure scenarios
-- [ ] A new reader can go from zero to running in under 30 minutes
+- [x] All three secret names in README exactly match the workflow YAML
+- [x] README explains the bi-weekly schedule and call budget clearly
+- [x] Troubleshooting covers 6 distinct failure scenarios
+- [x] A new reader can go from zero to running in under 30 minutes
 
 ---
 
@@ -481,7 +481,7 @@ TICKET-001  (setup) ✅
                                              │
                                         TICKET-007  (test mode) ✅
                                              │
-                                        TICKET-008  (docs) ← next
+                                        TICKET-008  (docs) ✅
 ```
 
 ---

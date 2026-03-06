@@ -45,7 +45,7 @@ def send_alert(
     sender = from_address or os.environ.get("RESEND_FROM", _DEFAULT_FROM)
 
     lowest_price = min(d["price"] for d in all_deals)
-    subject = f"✈ Flight Digest: SFO/SJC → LAS — cheapest from ${lowest_price:.0f}"
+    subject = f"✈ Flight Digest: SFO/OAK → LAS — cheapest from ${lowest_price:.0f}"
     if test_mode:
         subject = f"[TEST] {subject}"
 

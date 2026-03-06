@@ -2,12 +2,12 @@
 
 ## Overview
 
-A lightweight personal tool that monitors SFO and SJC → Las Vegas (LAS) flights and sends
+A lightweight personal tool that monitors SFO and OAK → Las Vegas (LAS) flights and sends
 a bi-weekly email digest showing the cheapest round-trip options across the next 3 months.
 It runs entirely in the cloud on a cron schedule using GitHub Actions — no home server or
 always-on machine required.
 
-**Scope:** SFO → LAS and SJC → LAS only. Reverse direction (LAS → Bay Area) is out of scope
+**Scope:** SFO → LAS and OAK → LAS only. Reverse direction (LAS → Bay Area) is out of scope
 to stay within the SerpAPI free tier (250 searches/month).
 
 **Trip patterns checked:** Friday → Sunday (weekend, 2 nights) and Thursday → Monday (long weekend, 4 nights).
@@ -46,7 +46,7 @@ Southwest, Frontier, Spirit, and Allegiant.
 │                  │   │  routes:                  │
 │  For each route  │   │    - origin: SFO          │
 │  × date pair:    │   │      destination: LAS     │
-│                  │   │    - origin: SJC          │
+│                  │   │    - origin: OAK          │
 │  Call 1:         │   │      destination: LAS     │
 │  outbound search │   │                           │
 │  → departure_    │   │  price_threshold: 150     │
@@ -111,7 +111,7 @@ Southwest, Frontier, Spirit, and Allegiant.
 
 | Variable                        | Value                    |
 |---------------------------------|--------------------------|
-| Routes                          | 2 (SFO→LAS, SJC→LAS)    |
+| Routes                          | 2 (SFO→LAS, OAK→LAS)    |
 | Trip patterns                   | 2 (Fri-Sun, Thu-Mon)     |
 | Departures in a 3-month window  | ~13                      |
 | Date pairs per route            | ~26 (13 × 2 patterns)    |
@@ -228,7 +228,7 @@ tickets have a clean foundation to build on.
 
 Build the module that fetches real-time round-trip flight prices from Google Flights via
 SerpAPI. Scans all Friday → Sunday and Thursday → Monday date pairs within a rolling 3-month
-window from the run date, for both SFO → LAS and SJC → LAS.
+window from the run date, for both SFO → LAS and OAK → LAS.
 
 **Tasks**
 
@@ -256,7 +256,7 @@ window from the run date, for both SFO → LAS and SJC → LAS.
 - [x] Function returns empty list (not an error) when no flights found for a date pair
 - [x] `generate_date_pairs(3, [...])` returns ~24 pairs covering the next 3 months
 - [x] No past dates appear in generated date pairs
-- [x] Both SFO and SJC work as valid origin inputs
+- [x] Both SFO and OAK work as valid origin inputs
 
 ---
 
@@ -320,7 +320,7 @@ working Google Flights booking links per deal.
   - [x] HTML email: blue header, summary banner, one table per route
   - [x] Columns: Depart | Return | Trip type | Price | Airline | Book (View button)
   - [x] Trip type auto-detected: "Weekend (Fri–Sun)" / "Long Weekend (Thu–Mon)" / "N-day trip"
-  - [x] Subject: `✈ Flight Digest: SFO/SJC → LAS — cheapest from $XX`
+  - [x] Subject: `✈ Flight Digest: SFO/OAK → LAS — cheapest from $XX`
   - [x] `[TEST]` prefix on subject when `test_mode=True`
   - [x] Guard clause: no-op when all deal lists are empty
   - [x] Descriptive `RuntimeError` on auth failure
@@ -420,7 +420,7 @@ for the cron schedule.
 
 - [x] `--test` flag implemented in `main.py`:
   - [x] Skips SerpAPI entirely
-  - [x] Injects fake deals for SFO→LAS (Fri-Sun, $99 Southwest) and SJC→LAS (Thu-Mon, $112 Frontier)
+  - [x] Injects fake deals for SFO→LAS (Fri-Sun, $99 Southwest) and OAK→LAS (Thu-Mon, $112 Frontier)
   - [x] Prints `[TEST MODE] Sending test digest to <email>`
   - [x] Sends real email via Resend with `[TEST]` subject prefix
 - [x] `workflow_dispatch` exposes `test_mode` boolean input → passes `--test` to script
@@ -489,7 +489,7 @@ TICKET-001  (setup) ✅
 ## Open Questions
 
 - [x] ~~Travelpayouts vs SerpAPI~~ — **Resolved: SerpAPI.**
-- [x] ~~Daily vs weekly vs bi-weekly~~ — **Resolved: bi-weekly (1st and 15th), SFO/SJC→LAS only.**
+- [x] ~~Daily vs weekly vs bi-weekly~~ — **Resolved: bi-weekly (1st and 15th), SFO/OAK→LAS only.**
 - [x] ~~Which trip patterns~~ — **Resolved: Fri→Sun (2 nights) and Thu→Mon (4 nights, long weekend).**
 - [x] ~~How far ahead to scan~~ — **Resolved: 3-month rolling window anchored to today's date.**
 - [ ] Should the digest send even if no deals are below threshold, showing the cheapest

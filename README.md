@@ -1,6 +1,6 @@
 # Flight Price Tracker
 
-A lightweight personal tool that monitors SFO and SJC → Las Vegas (LAS) flights and sends
+A lightweight personal tool that monitors SFO and OAK → Las Vegas (LAS) flights and sends
 a bi-weekly email digest of the cheapest round-trip options across the next 3 months.
 Runs entirely on GitHub Actions — no server required.
 
@@ -13,7 +13,7 @@ Runs entirely on GitHub Actions — no server required.
 ## How It Works
 
 1. GitHub Actions wakes up on the 1st and 15th of each month
-2. Fetches real-time prices from Google Flights via SerpAPI for both SFO→LAS and SJC→LAS
+2. Fetches real-time prices from Google Flights via SerpAPI for both SFO→LAS and OAK→LAS
 3. Filters deals below your price threshold
 4. Sends a grouped HTML digest email via Resend if any deals are found
 
@@ -58,7 +58,7 @@ cp config.example.yaml config.yaml
 routes:
   - origin: SFO
     destination: LAS
-  - origin: SJC
+  - origin: OAK
     destination: LAS
 
 price_threshold: 150       # max round-trip price in USD to include in digest

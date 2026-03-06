@@ -5,7 +5,7 @@
 routes:
   - origin: SFO          # IATA airport code for departure
     destination: LAS     # IATA airport code for arrival
-  - origin: SJC          # Norman Y. Mineta San Jose International
+  - origin: OAK          # Oakland International Airport
     destination: LAS
   # Add more routes as needed
 

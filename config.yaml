@@ -1,7 +1,7 @@
 routes:
   - origin: SFO
     destination: LAS
-  - origin: SJC
+  - origin: OAK
     destination: LAS
 
 price_threshold: 150

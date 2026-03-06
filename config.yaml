@@ -1,0 +1,13 @@
+routes:
+  - origin: SFO
+    destination: LAS
+  - origin: SJC
+    destination: LAS
+
+price_threshold: 150
+min_price_sanity: 10
+scan_months_ahead: 3
+
+trip_patterns:
+  - [Friday, Sunday]
+  - [Thursday, Monday]

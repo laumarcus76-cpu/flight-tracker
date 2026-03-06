@@ -25,4 +25,14 @@ def find_deals(
     Returns:
         Filtered, deduplicated, price-ascending list of flight dicts.
     """
-    raise NotImplementedError
+    # Deduplicate by (depart_date, return_date), keeping the lowest price per pair
+    best: dict[tuple[str, str], dict] = {}
+    for flight in flights:
+        price = flight.get("price", float("inf"))
+        if price < min_price or price > threshold:
+            continue
+        key = (flight["depart_date"], flight["return_date"])
+        if key not in best or price < best[key]["price"]:
+            best[key] = flight
+
+    return sorted(best.values(), key=lambda f: f["price"])

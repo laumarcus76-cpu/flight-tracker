@@ -1,0 +1,21 @@
+# Flight Price Tracker — Configuration
+# Copy this file to config.yaml and edit as needed.
+# config.yaml is gitignored; never commit it if it contains personal data.
+
+routes:
+  - origin: SFO          # IATA airport code for departure
+    destination: LAS     # IATA airport code for arrival
+  # Add more routes as needed:
+  # - origin: SFO
+  #   destination: JFK
+
+price_threshold: 150     # Max round-trip price in USD to trigger an alert
+
+min_price_sanity: 10     # Ignore prices below this value (likely bad data)
+
+departure_months:        # Months to check for deals (YYYY-MM format)
+  - "2026-04"
+  - "2026-05"
+
+trip_length_min_days: 2  # Minimum trip length in days (0 = no filter)
+trip_length_max_days: 7  # Maximum trip length in days (0 = no filter)

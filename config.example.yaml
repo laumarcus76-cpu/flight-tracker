@@ -5,9 +5,9 @@
 routes:
   - origin: SFO          # IATA airport code for departure
     destination: LAS     # IATA airport code for arrival
-  # Add more routes as needed:
-  # - origin: SFO
-  #   destination: JFK
+  - origin: SJC          # Norman Y. Mineta San Jose International
+    destination: LAS
+  # Add more routes as needed
 
 price_threshold: 150     # Max round-trip price in USD to trigger an alert
 

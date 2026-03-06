@@ -1,1 +1,40 @@
-# GitHub Actions workflow — implemented in TICKET-005
+name: Check Flight Prices
+
+on:
+  schedule:
+    - cron: "0 13 * * *"  # Daily at 1pm UTC (5am or 6am Pacific)
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: "Send a test alert with fake data (skips SerpAPI)"
+        required: false
+        default: "false"
+        type: boolean
+
+jobs:
+  check-prices:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run flight price checker
+        env:
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: |
+          if [ "${{ inputs.test_mode }}" = "true" ]; then
+            python main.py --test
+          else
+            python main.py
+          fi

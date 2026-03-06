@@ -227,7 +227,7 @@ tickets have a clean foundation to build on.
 
 ### TICKET-002 — SerpAPI Google Flights Integration
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Complexity:** Medium
 - **Depends on:** TICKET-001
 
@@ -293,7 +293,7 @@ round-trip price per date pair from all carriers.
 
 ### TICKET-003 — Price Comparison Logic
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Complexity:** Medium
 - **Depends on:** TICKET-002
 
@@ -332,7 +332,7 @@ data anomalies, deduplicates, and sorts so the digest email is clean and ranked 
 
 ### TICKET-004 — Resend Email Digest
 
-- **Status:** [ ]
+- **Status:** [x]
 - **Complexity:** Medium
 - **Depends on:** TICKET-003
 
@@ -526,11 +526,11 @@ TICKET-001  (setup) ✅
      │
      ├──► TICKET-006  (config)
      │
-     ├──► TICKET-002  (SerpAPI integration)
+     ├──► TICKET-002  (SerpAPI integration) ✅
      │         │
-     │         └──► TICKET-003  (price logic)
+     │         └──► TICKET-003  (price logic) ✅
      │                   │
-     │                   └──► TICKET-004  (email digest)
+     │                   └──► TICKET-004  (email digest) ✅
      │                             │
      └──────────────────────────── └──► TICKET-005  (GitHub Actions)
                                              │

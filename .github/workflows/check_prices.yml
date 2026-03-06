@@ -2,7 +2,7 @@ name: Check Flight Prices
 
 on:
   schedule:
-    - cron: "0 13 * * *"  # Daily at 1pm UTC (5am or 6am Pacific)
+    - cron: "0 13 1,15 * *"  # 1st and 15th of each month at 1pm UTC (5-6am Pacific)
   workflow_dispatch:
     inputs:
       test_mode:

@@ -1,6 +1,6 @@
 # Flight Price Tracker — Configuration
 # Copy this file to config.yaml and edit as needed.
-# config.yaml is gitignored; never commit it if it contains personal data.
+# config.yaml is gitignored — never commit it if it contains personal data.
 
 routes:
   - origin: SFO          # IATA airport code for departure
@@ -9,13 +9,13 @@ routes:
     destination: LAS
   # Add more routes as needed
 
-price_threshold: 150     # Max round-trip price in USD to trigger an alert
+price_threshold: 150     # Max round-trip price in USD to include in digest
 
 min_price_sanity: 10     # Ignore prices below this value (likely bad data)
 
-departure_months:        # Months to check for deals (YYYY-MM format)
-  - "2026-04"
-  - "2026-05"
+scan_months_ahead: 3     # How many months ahead from today to scan
+                         # Keep at 3 to stay within SerpAPI 250/month free tier
 
-trip_length_min_days: 2  # Minimum trip length in days (0 = no filter)
-trip_length_max_days: 7  # Maximum trip length in days (0 = no filter)
+trip_patterns:           # Weekday pairs to check for each route
+  - [Friday, Sunday]     # Weekend trip (2 nights)
+  - [Thursday, Monday]   # Long weekend (4 nights)

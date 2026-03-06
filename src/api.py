@@ -44,13 +44,13 @@ def generate_date_pairs(
     Args:
         scan_months_ahead: how many months ahead from today to scan
         trip_patterns: list of [depart_weekday, return_weekday] pairs.
-                       Defaults to [["Friday","Sunday"], ["Friday","Monday"]]
+                       Defaults to [["Friday","Sunday"], ["Thursday","Monday"]]
 
     Returns:
         Sorted, deduplicated list of ("YYYY-MM-DD", "YYYY-MM-DD") tuples.
     """
     if trip_patterns is None:
-        trip_patterns = [["Friday", "Sunday"], ["Friday", "Monday"]]
+        trip_patterns = [["Friday", "Sunday"], ["Thursday", "Monday"]]
 
     today = date.today()
     min_depart = today + timedelta(days=_MIN_DAYS_OUT)
@@ -186,8 +186,10 @@ def get_cheapest_round_trips(
         legs = cheapest_ret.get("flights", [])
         airline = legs[0].get("airline", "Unknown") if legs else "Unknown"
 
-        # Google Flights search link (opens pre-filled search; not a booking deep-link)
-        link = _google_flights_link(origin, destination, depart_date, return_date)
+        # Use booking_token (from Call 2) as the tfs param to open the exact itinerary
+        booking_token = cheapest_ret.get("booking_token")
+        link = _google_flights_link(origin, destination, depart_date, return_date,
+                                    booking_token=booking_token)
 
         results.append(
             {
@@ -223,11 +225,24 @@ def _check_error(data: dict, *, call: int, origin: str, destination: str,
 
 
 def _google_flights_link(origin: str, destination: str,
-                          depart_date: str, return_date: str) -> str:
-    """Return a Google Flights search URL pre-filled with the route and dates."""
+                          depart_date: str, return_date: str,
+                          booking_token: str | None = None) -> str:
+    """
+    Return a Google Flights URL for the itinerary.
+
+    If a booking_token is available (from Call 2), uses it as the tfs parameter
+    to open the exact selected itinerary on Google Flights.
+    Falls back to a pre-filled search URL when no token is present.
+    """
+    if booking_token:
+        return (
+            f"https://www.google.com/travel/flights?"
+            f"tfs={booking_token}&hl=en&curr=USD"
+        )
+    # Fallback: generic round-trip search URL
     return (
-        f"https://www.google.com/travel/flights/search"
-        f"?tfs=CBwQAhoeEgoyMDI2LTA0LTExagcIARIDU0ZPcgcIARIDTEFT"
+        f"https://www.google.com/travel/flights?"
+        f"hl=en&curr=USD"
         f"#flt={origin}.{destination}.{depart_date}"
         f"*{destination}.{origin}.{return_date};c:USD;e:1;sd:1;t:f"
     )
@@ -242,8 +257,8 @@ if __name__ == "__main__":
     if not api_key:
         raise SystemExit("SERPAPI_KEY environment variable is not set.")
 
-    print("Generating date pairs (3 months, Fri-Sun + Fri-Mon)...")
-    pairs = generate_date_pairs(3, [["Friday", "Sunday"], ["Friday", "Monday"]])
+    print("Generating date pairs (3 months, Fri-Sun + Thu-Mon)...")
+    pairs = generate_date_pairs(3, [["Friday", "Sunday"], ["Thursday", "Monday"]])
     print(f"Generated {len(pairs)} date pairs. First 4: {pairs[:4]}\n")
 
     print("Fetching SFO → LAS (first 2 date pairs)...")

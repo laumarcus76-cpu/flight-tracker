@@ -2,13 +2,19 @@
 
 ## Overview
 
-A lightweight personal tool that monitors specific flight routes and sends an email alert
-when round-trip prices drop below a configurable threshold (default: $150). It runs entirely
-in the cloud on a cron schedule using GitHub Actions — no home server or always-on machine
-required.
+A lightweight personal tool that monitors SFO and SJC → Las Vegas (LAS) flights and sends
+a bi-weekly email digest showing the cheapest round-trip options across the next 3 months.
+It runs entirely in the cloud on a cron schedule using GitHub Actions — no home server or
+always-on machine required.
 
-**Core value:** Wake up to an email saying "SFO → LAS round trip: $118" instead of
-manually checking Google Flights every week.
+**Scope:** SFO → LAS and SJC → LAS only. Reverse direction (LAS → Bay Area) is out of scope
+to stay within the SerpAPI free tier (250 searches/month).
+
+**Trip patterns checked:** Friday → Sunday (weekend) and Friday → Monday (long weekend).
+
+**Core value:** Receive a bi-weekly email showing every cheap round-trip option from both
+Bay Area airports for the next 3 months — sorted by price, covering all airlines including
+Southwest, Frontier, Spirit, and Allegiant.
 
 ---
 
@@ -18,7 +24,7 @@ manually checking Google Flights every week.
 ┌─────────────────────────────────────────────────────────────────┐
 │                        GitHub Actions                           │
 │                                                                 │
-│   cron schedule (e.g., daily at 8am UTC)                        │
+│   cron: 0 13 1,15 * *  (1st and 15th of each month, 1pm UTC)   │
 │         │                                                       │
 │         ▼                                                       │
 │   runner checks out repo                                        │
@@ -34,39 +40,44 @@ manually checking Google Flights every week.
           ┌──────────┴──────────┐
           │                     │
           ▼                     ▼
-┌──────────────────┐   ┌─────────────────────┐
-│ SerpAPI          │   │   config.yaml        │
-│ Google Flights   │   │                      │
-│                  │   │  routes:             │
-│  Step 1:         │   │    - origin: SFO     │
-│  GET outbound    │   │      dest: LAS       │
-│  flights →       │   │    - origin: SJC     │
-│  departure_token │   │      dest: LAS       │
-│                  │   │  threshold: 150      │
-│  Step 2:         │   │  departure_months:   │
-│  GET return      │   │    - 2026-04         │
-│  flights using   │   │    - 2026-05         │
-│  departure_token │   └─────────────────────┘
-│  → round-trip    │
-│  combined price  │
+┌──────────────────┐   ┌──────────────────────────┐
+│ SerpAPI          │   │   config.yaml             │
+│ Google Flights   │   │                           │
+│                  │   │  routes:                  │
+│  For each route  │   │    - origin: SFO          │
+│  × date pair:    │   │      destination: LAS     │
+│                  │   │    - origin: SJC          │
+│  Call 1:         │   │      destination: LAS     │
+│  outbound search │   │                           │
+│  → departure_    │   │  price_threshold: 150     │
+│    token         │   │  scan_months_ahead: 3     │
+│                  │   │  trip_patterns:           │
+│  Call 2:         │   │    - [Friday, Sunday]     │
+│  return search   │   │    - [Friday, Monday]     │
+│  using token     │   └──────────────────────────┘
+│  → combined      │
+│    round-trip    │
+│    price         │
 │                  │
-│  Covers all LCCs │
-│  (SW, Frontier,  │
+│  All carriers:   │
+│  SW, Frontier,   │
 │  Spirit,         │
-│  Allegiant)      │
+│  Allegiant, etc. │
 └────────┬─────────┘
          │
          ▼
   price comparison logic
   (filter < threshold,
-   reject suspiciously low,
-   deduplicate)
+   reject bad data < $10,
+   deduplicate by date pair,
+   sort by price ascending)
          │
          ├─── no deals found ──► exit 0 (no email sent)
          │
          ▼
-  format alert payload
-  (route, price, dates,
+  format bi-weekly digest
+  (all deals grouped by route,
+   sorted price-ascending,
    deep-link to booking)
          │
          ▼
@@ -74,8 +85,8 @@ manually checking Google Flights every week.
 │   Resend.com API    │
 │                     │
 │  POST /emails       │
-│  HTML email with    │
-│  flight details     │
+│  HTML digest with   │
+│  all routes/deals   │
 │  sent to            │
 │  ALERT_EMAIL        │
 └─────────────────────┘
@@ -94,7 +105,30 @@ manually checking Google Flights every week.
 | Secrets management | GitHub Secrets           | Injected as env vars at runtime                   |
 | Configuration      | config.yaml              | Versioned in repo, no code changes needed         |
 
-### SerpAPI Google Flights — Two-Call Flow
+---
+
+## API Call Budget
+
+| Variable                        | Value                  |
+|---------------------------------|------------------------|
+| Routes                          | 2 (SFO→LAS, SJC→LAS)  |
+| Trip patterns                   | 2 (Fri-Sun, Fri-Mon)   |
+| Fridays in a 3-month window     | ~13                    |
+| Date pairs per route            | ~26 (13 × 2 patterns)  |
+| API calls per date pair         | 2 (two-call flow)      |
+| **Calls per run**               | **~104**               |
+| Runs per month                  | 2 (1st and 15th)       |
+| **Total calls per month**       | **~208**               |
+| SerpAPI free tier               | 250/month              |
+| **Headroom**                    | **~42 calls (~17%)**   |
+
+> **Note:** If the 3-month window falls on a month boundary with extra Fridays, the per-run
+> call count may reach ~112 (224/month). Still within the 250 free tier. The config allows
+> reducing `scan_months_ahead` to 2 if needed.
+
+---
+
+## SerpAPI Two-Call Round-Trip Flow
 
 Fetching a round-trip price requires two sequential API calls per (origin, destination, date-pair):
 
@@ -104,13 +138,13 @@ Fetching a round-trip price requires two sequential API calls per (origin, desti
    ?engine=google_flights
    &departure_id=SFO
    &arrival_id=LAS
-   &outbound_date=2026-04-10
-   &return_date=2026-04-14
-   &type=1              ← round trip
+   &outbound_date=2026-04-11    ← Friday
+   &return_date=2026-04-13      ← Sunday (or Monday for long weekend)
+   &type=1                      ← round trip
    &currency=USD
    &api_key=SERPAPI_KEY
    ```
-   Returns outbound flight options. Each option includes a `departure_token`.
+   Returns outbound itineraries. Each includes a `departure_token`.
 
 2. **Call 2 — Return + combined price:**
    ```
@@ -118,17 +152,14 @@ Fetching a round-trip price requires two sequential API calls per (origin, desti
    ?engine=google_flights
    &departure_id=SFO
    &arrival_id=LAS
-   &outbound_date=2026-04-10
-   &return_date=2026-04-14
+   &outbound_date=2026-04-11
+   &return_date=2026-04-13
    &type=1
    &departure_token=<token_from_call_1>
    &currency=USD
    &api_key=SERPAPI_KEY
    ```
-   Returns return flight options with the **combined round-trip price** for each pairing.
-
-**Budget:** At 1 check/day with 2 origins (SFO + SJC) × 2 calls = ~4 calls/day × 30 = ~120 calls/month.
-Free tier allows 250/month — comfortably within budget. Add date-range scanning and budget accordingly.
+   Returns return itineraries with the **combined round-trip price** for each pairing.
 
 ---
 
@@ -180,7 +211,7 @@ tickets have a clean foundation to build on.
   ├── README.md
   └── main.py             # entry point
   ```
-- [x] Add `requirements.txt` with pinned versions: `google-search-results`, `pyyaml`, `resend`, `python-dotenv`
+- [x] Add `requirements.txt` with pinned versions: `google-search-results`, `pyyaml`, `resend`, `python-dotenv`, `pytest`
 - [x] Add `.gitignore` covering: `__pycache__/`, `*.pyc`, `.env`, `config.yaml`
 - [x] Add `config.example.yaml` with all fields documented inline
 - [x] Verify `python -m pip install -r requirements.txt` runs without errors
@@ -203,9 +234,9 @@ tickets have a clean foundation to build on.
 **Purpose**
 
 Build the module that fetches real-time round-trip flight prices from Google Flights via
-SerpAPI for a given origin, destination, and set of target date pairs. SerpAPI returns
-live, bookable prices aggregated from all carriers including low-cost carriers (Southwest,
-Frontier, Spirit, Allegiant) — the carriers most likely to have sub-$150 SFO/SJC→LAS fares.
+SerpAPI. Scans all Friday → Sunday and Friday → Monday date pairs within a rolling 3-month
+window from the run date, for both SFO → LAS and SJC → LAS. Returns the cheapest combined
+round-trip price per date pair from all carriers.
 
 **SerpAPI account setup:**
 - Sign up at https://serpapi.com (free, instant, no approval)
@@ -215,40 +246,48 @@ Frontier, Spirit, Allegiant) — the carriers most likely to have sub-$150 SFO/S
 **Tasks**
 
 - [ ] Sign up for SerpAPI and obtain an API key
-- [ ] Read the [SerpAPI Google Flights docs](https://serpapi.com/google-flights-api) to confirm
-      the two-call round-trip flow (outbound → departure_token → return + combined price)
+- [ ] Read the [SerpAPI Google Flights docs](https://serpapi.com/google-flights-api) and
+      confirm the two-call round-trip flow
 - [ ] Implement `src/api.py`:
   - `get_cheapest_round_trips(origin, destination, date_pairs, api_key)` function
     - `date_pairs`: list of `(depart_date, return_date)` tuples as `"YYYY-MM-DD"` strings
-    - For each date pair, makes 2 sequential API calls (outbound, then return with token)
-    - Extracts the cheapest combined round-trip price per date pair from Call 2 results
-    - Adds a small sleep (0.5s) between date pairs to respect rate limits
+    - For each date pair: Call 1 (outbound) → extract cheapest `departure_token` → Call 2
+      (return with token) → extract cheapest combined round-trip price
+    - Sleeps 0.5s between date pairs to respect rate limits
     - Handles HTTP errors and non-200 responses with descriptive exceptions
     - Returns a list of dicts:
       ```python
       [
         {
-          "depart_date": "2026-04-10",
-          "return_date": "2026-04-14",
-          "price": 124,
+          "depart_date": "2026-04-11",
+          "return_date": "2026-04-13",
+          "price": 118.0,
           "airline": "Southwest",
           "link": "https://www.google.com/flights/..."
         }
       ]
       ```
-  - `generate_date_pairs(months, min_days, max_days)` helper
-    - Given a list of `"YYYY-MM"` months and trip length bounds, generates all
-      (Friday, Sunday) or configurable weekday pairs within each month
-- [ ] Add a `__main__` block to `src/api.py` for quick manual testing: `python -m src.api`
+  - `generate_date_pairs(scan_months_ahead, trip_patterns)` helper
+    - Computes a rolling window: today → today + `scan_months_ahead` months
+    - Finds all Fridays in that window
+    - For each Friday, generates one date pair per trip pattern:
+      - `("Friday", "Sunday")` → depart_date=Friday, return_date=Friday+2
+      - `("Friday", "Monday")` → depart_date=Friday, return_date=Friday+3
+    - Skips any departure date in the past or within 3 days of today
+    - Returns sorted list of `(depart_date_str, return_date_str)` tuples
+- [ ] Add a `__main__` block for quick manual testing: `python -m src.api`
 
 **Acceptance Criteria**
 
-- [ ] `get_cheapest_round_trips("SFO", "LAS", [("2026-04-10", "2026-04-14")], key)` returns
-      a non-empty list when Google Flights has results for that route/date
-- [ ] Function raises a clear exception (not a silent failure) when the API key is invalid
+- [ ] `get_cheapest_round_trips("SFO", "LAS", [("2026-04-11", "2026-04-13")], key)` returns
+      a non-empty list when Google Flights has results
+- [ ] Function raises a clear exception when the API key is invalid
 - [ ] Function returns an empty list (not an error) when no flights are found for a date pair
+- [ ] `generate_date_pairs(3, [("Friday","Sunday"),("Friday","Monday")])` returns ~26 pairs
+      covering the next 3 months
+- [ ] No past dates appear in the generated date pairs
 - [ ] Manual test (`python -m src.api`) prints results to stdout without crashing
-- [ ] Both SFO and SJC origins work as valid `origin` inputs
+- [ ] Both SFO and SJC work as valid origin inputs
 
 ---
 
@@ -260,9 +299,8 @@ Frontier, Spirit, Allegiant) — the carriers most likely to have sub-$150 SFO/S
 
 **Purpose**
 
-Filter the raw API results down to actionable deals. This layer applies the price threshold,
-rejects data anomalies (e.g., $1 fares that are API errors), and deduplicates results so
-the email is clean and readable.
+Filter the raw API results down to actionable deals. Applies the price threshold, rejects
+data anomalies, deduplicates, and sorts so the digest email is clean and ranked by value.
 
 **Tasks**
 
@@ -279,6 +317,8 @@ the email is clean and readable.
   - Test: suspiciously low price (below min_price) is excluded
   - Test: duplicate date pairs are deduplicated, keeping lowest price
   - Test: empty input returns empty list
+  - Test: price exactly at threshold is included
+  - Test: price $1 above threshold is excluded
 
 **Acceptance Criteria**
 
@@ -290,7 +330,7 @@ the email is clean and readable.
 
 ---
 
-### TICKET-004 — Resend Email Integration
+### TICKET-004 — Resend Email Digest
 
 - **Status:** [ ]
 - **Complexity:** Medium
@@ -298,29 +338,34 @@ the email is clean and readable.
 
 **Purpose**
 
-Send a formatted HTML email when deals are found. The email should be immediately actionable:
-include the route, price, travel dates, and a link to book. One email per run (batched),
-not one email per deal.
+Send a formatted HTML bi-weekly digest email listing all deals found across both routes,
+grouped by route, sorted by price. The email gives an at-a-glance view of the cheapest
+options for the next 3 months from both Bay Area airports.
 
 **Tasks**
 
 - [ ] Sign up for Resend.com and obtain an API key
 - [ ] Verify a sender domain or use the Resend sandbox address for testing
 - [ ] Implement `src/notifier.py`:
-  - `send_alert(deals, route, recipient_email, api_key)` function
-  - Builds an HTML email body listing all deals in a readable table
-  - Subject line: `Flight Alert: SFO → LAS from $XX`  (uses the lowest price found)
-  - Each deal row shows: departure date, return date, price, airline, booking link
-  - Does not send if `deals` is empty (guard clause)
-- [ ] Add a plain-text fallback body for email clients that don't render HTML
+  - `send_alert(deals_by_route, recipient_email, api_key)` function
+    - `deals_by_route`: dict mapping route label (e.g. `"SFO → LAS"`) to list of deal dicts
+    - Builds an HTML email with one section per route
+    - Each section: sorted price-ascending table of deals with columns:
+      Departure date | Return date | Trip type | Price | Airline | Book
+    - Trip type column shows "Weekend (Fri-Sun)" or "Long Weekend (Fri-Mon)"
+    - Subject line: `✈ Flight Digest: SFO/SJC → LAS — cheapest from $XX` (lowest price across all routes)
+    - Guard clause: returns early (no API call) if all deal lists are empty
+  - Plain-text fallback body listing deals in a readable format
+- [ ] Add a plain-text fallback body
 
 **Acceptance Criteria**
 
-- [ ] Calling `send_alert` with one deal delivers an email to the recipient address
-- [ ] Subject line correctly reflects the lowest price in the deals list
-- [ ] Email renders a readable table in Gmail and Apple Mail
-- [ ] Function is a no-op (returns early, no API call made) when `deals` is empty
-- [ ] Invalid API key raises an exception with a clear message, not a silent failure
+- [ ] Email renders a readable grouped table in Gmail and Apple Mail
+- [ ] Subject line uses the lowest price found across all routes
+- [ ] Each route section is clearly labeled and sorted price-ascending
+- [ ] Trip type (Fri-Sun vs Fri-Mon) is visible per row
+- [ ] Function is a no-op when all deal lists are empty
+- [ ] Invalid API key raises a clear exception
 
 ---
 
@@ -332,15 +377,13 @@ not one email per deal.
 
 **Purpose**
 
-Wire everything together so the script runs automatically in the cloud on a schedule.
-GitHub Actions provides free compute, secret injection, and cron scheduling without
-any infrastructure to maintain.
+Wire everything together so the script runs automatically on the 1st and 15th of each month.
 
 **Tasks**
 
-- [ ] Create `.github/workflows/check_prices.yml`:
-  - Trigger: `schedule` (cron) + `workflow_dispatch` (manual trigger from GitHub UI)
-  - Cron: `0 13 * * *` (daily at 1pm UTC / 5am or 6am Pacific depending on DST)
+- [ ] Update `.github/workflows/check_prices.yml`:
+  - Trigger: `schedule` (cron) + `workflow_dispatch` (manual trigger)
+  - Cron: `0 13 1,15 * *` (1st and 15th of each month at 1pm UTC / ~5-6am Pacific)
   - Runner: `ubuntu-latest`
   - Steps:
     1. Checkout repo
@@ -356,12 +399,12 @@ any infrastructure to maintain.
 
 **Acceptance Criteria**
 
-- [ ] Workflow file passes YAML lint (`yamllint` or GitHub's built-in validator)
-- [ ] Manual trigger (`workflow_dispatch`) runs successfully end-to-end in GitHub Actions
-- [ ] Workflow completes in under 2 minutes on a normal run
-- [ ] Cron trigger fires on schedule (verify via Actions tab after 24 hours)
-- [ ] Secrets are never printed to workflow logs (no `echo $SERPAPI_KEY` anywhere)
-- [ ] If the Python script exits with a non-zero code, the workflow run is marked as failed
+- [ ] Workflow file passes YAML lint
+- [ ] Manual trigger (`workflow_dispatch`) runs successfully end-to-end
+- [ ] Workflow completes in under 3 minutes on a normal run
+- [ ] Cron fires on the 1st and 15th (verify via Actions tab)
+- [ ] Secrets are never printed to workflow logs
+- [ ] Non-zero Python exit code marks the workflow run as failed
 
 ---
 
@@ -373,41 +416,42 @@ any infrastructure to maintain.
 
 **Purpose**
 
-Make the tracker useful beyond the initial SFO/SJC → LAS use case without requiring code
-changes. All user-tunable settings live in `config.yaml` and are validated at startup.
+All user-tunable settings live in `config.yaml`. Changing routes, threshold, scan window,
+or trip patterns requires no code changes.
 
 **Tasks**
 
-- [ ] Define `config.example.yaml` schema:
+- [ ] Define final `config.example.yaml` schema:
   ```yaml
   routes:
-    - origin: SFO          # IATA code
+    - origin: SFO
       destination: LAS
-    - origin: SJC          # Check both Bay Area airports
+    - origin: SJC
       destination: LAS
 
-  price_threshold: 150       # Max round-trip price in USD to trigger alert
+  price_threshold: 150       # Max round-trip price in USD to include in digest
   min_price_sanity: 10       # Ignore prices below this (likely bad data)
 
-  departure_months:
-    - "2026-04"
-    - "2026-05"
+  scan_months_ahead: 3       # How many months ahead to scan from today's date
+                             # Keep at 3 to stay within SerpAPI 250/month free tier
 
-  trip_length_min_days: 2    # Minimum trip length filter (0 = no filter)
-  trip_length_max_days: 7    # Maximum trip length filter (0 = no filter)
+  trip_patterns:             # Day-of-week pairs to check
+    - [Friday, Sunday]       # Weekend trip (2 nights)
+    - [Friday, Monday]       # Long weekend (3 nights)
   ```
 - [ ] Implement `src/config.py`:
   - `load_config(path="config.yaml")` function
-  - Validates required fields are present; raises `ValueError` with a clear message if not
-  - Returns a typed dict or dataclass
-- [ ] Update `main.py` to load config first and pass values to all modules
+  - Validates required fields; raises `ValueError` with a clear message if missing
+  - Returns validated `Config` dataclass
+- [ ] Update `main.py` to load config and pass values to all modules
 
 **Acceptance Criteria**
 
-- [ ] Adding a second route to `config.yaml` causes both routes to be checked with no code changes
-- [ ] Changing `price_threshold` to 100 correctly filters results without touching any `.py` file
-- [ ] Missing required field (e.g., no `routes`) raises a `ValueError` with a message explaining what is missing
-- [ ] `config.example.yaml` is committed and contains inline comments explaining every field
+- [ ] Adding a route to `config.yaml` causes it to be checked with no code changes
+- [ ] Reducing `scan_months_ahead` to 2 correctly shrinks the date pairs scanned
+- [ ] Adding `[Saturday, Monday]` to `trip_patterns` causes Sat→Mon pairs to be generated
+- [ ] Missing required field raises `ValueError` naming the missing field
+- [ ] `config.example.yaml` is committed with inline comments on every field
 
 ---
 
@@ -419,26 +463,30 @@ changes. All user-tunable settings live in `config.yaml` and are validated at st
 
 **Purpose**
 
-Provide a way to trigger a test alert email without waiting for the cron job and without
-needing actual cheap flights to exist. Essential for verifying the full email pipeline
-works before deployment.
+Verify the full email pipeline works without waiting for the cron and without needing real
+cheap flights to exist.
 
 **Tasks**
 
 - [ ] Add a `--test` flag to `main.py`:
-  - When passed, skip the API call entirely
-  - Inject a hardcoded fake deal: `{"depart_date": "2026-04-10", "return_date": "2026-04-14", "price": 99, "airline": "Southwest", "link": "https://example.com"}`
-  - Run the full notifier pipeline with the fake deal
-  - Print `[TEST MODE] Sending test alert to <email>` to stdout
+  - Skips the SerpAPI call entirely
+  - Injects fake deals for both routes:
+    ```python
+    {
+      "SFO → LAS": [{"depart_date":"2026-04-11","return_date":"2026-04-13","price":99,"airline":"Southwest","link":"https://example.com"}],
+      "SJC → LAS": [{"depart_date":"2026-04-11","return_date":"2026-04-14","price":112,"airline":"Frontier","link":"https://example.com"}]
+    }
+    ```
+  - Prints `[TEST MODE] Sending test digest to <email>` to stdout
 - [ ] Document the flag in the README
-- [ ] Add `--test` support to the GitHub Actions workflow as an optional input on `workflow_dispatch`
+- [ ] Expose `test_mode` boolean input on `workflow_dispatch` in the workflow YAML
 
 **Acceptance Criteria**
 
-- [ ] `python main.py --test` sends a real email to `ALERT_EMAIL` with the fake deal data
-- [ ] Test mode email subject clearly indicates it is a test (e.g., `[TEST] Flight Alert: ...`)
-- [ ] Running `python main.py --test` does not make any calls to the SerpAPI
-- [ ] The GitHub Actions `workflow_dispatch` trigger exposes a `test_mode` boolean input that passes `--test` to the script when set to `true`
+- [ ] `python main.py --test` sends a real email with fake deal data for both routes
+- [ ] Subject line includes `[TEST]`
+- [ ] No SerpAPI calls are made in test mode
+- [ ] `workflow_dispatch` with `test_mode: true` passes `--test` to the script
 
 ---
 
@@ -448,32 +496,26 @@ works before deployment.
 - **Complexity:** Low
 - **Depends on:** All other tickets
 
-**Purpose**
-
-Write a README that allows someone (including future-you) to go from zero to a running
-flight tracker in under 30 minutes. Cover account setup, secret configuration, and how
-to verify the system is working.
-
 **Tasks**
 
 - [ ] Write `README.md` covering:
   - [ ] **What it does** — 2-3 sentence description
-  - [ ] **Prerequisites** — Python 3.11+, a GitHub account, a SerpAPI account, a Resend account
-  - [ ] **Account setup** — step-by-step for SerpAPI (where to find the API key, free tier limits) and Resend (how to verify a sender, where to find the API key)
-  - [ ] **Configuration** — how to copy `config.example.yaml` to `config.yaml` and edit routes/threshold/months
-  - [ ] **GitHub Secrets setup** — exact secret names (`SERPAPI_KEY`, `RESEND_API_KEY`, `ALERT_EMAIL`) and where to add them in the GitHub UI
-  - [ ] **Running locally** — `pip install -r requirements.txt` and `python main.py --test`
-  - [ ] **Verifying the workflow** — how to trigger manually via `workflow_dispatch` and where to check logs
-  - [ ] **Customizing the cron schedule** — link to crontab.guru, explain the current schedule
-  - [ ] **Troubleshooting** — common failure modes: bad API key, no sender domain verified in Resend, no flights found for route, exceeding SerpAPI free tier (250/month)
-  - [ ] **SerpAPI free tier note** — 250 searches/month; explain call budget (2 origins × 2 calls × 30 days = ~120/month)
+  - [ ] **Prerequisites** — Python 3.11+, GitHub account, SerpAPI account, Resend account
+  - [ ] **Account setup** — SerpAPI (where to find key, free tier limits) and Resend (sender verification, key)
+  - [ ] **Configuration** — copy `config.example.yaml` to `config.yaml`, edit routes/threshold/scan window
+  - [ ] **SerpAPI call budget** — explain 250/month limit and why `scan_months_ahead: 3` is the safe default
+  - [ ] **GitHub Secrets setup** — exact names: `SERPAPI_KEY`, `RESEND_API_KEY`, `ALERT_EMAIL`
+  - [ ] **Running locally** — `pip install -r requirements.txt` → `python main.py --test`
+  - [ ] **Verifying the workflow** — `workflow_dispatch`, where to check logs
+  - [ ] **Cron schedule** — explain `0 13 1,15 * *`, link to crontab.guru
+  - [ ] **Troubleshooting** — bad API key, Resend sender not verified, no flights found, exceeding SerpAPI limit
 
 **Acceptance Criteria**
 
-- [ ] A person unfamiliar with the codebase can follow the README and have the tracker running without asking any clarifying questions
-- [ ] All three secret names in the README exactly match the names used in the workflow YAML
-- [ ] README includes a note that `config.yaml` should not be committed if it contains personal info (email addresses, etc.)
-- [ ] Troubleshooting section covers at least 3 distinct failure scenarios
+- [ ] All three secret names in README exactly match the workflow YAML
+- [ ] README explains the bi-weekly schedule and call budget clearly
+- [ ] Troubleshooting covers at least 3 failure scenarios
+- [ ] A new reader can go from zero to running in under 30 minutes
 
 ---
 
@@ -488,7 +530,7 @@ TICKET-001  (setup) ✅
      │         │
      │         └──► TICKET-003  (price logic)
      │                   │
-     │                   └──► TICKET-004  (email)
+     │                   └──► TICKET-004  (email digest)
      │                             │
      └──────────────────────────── └──► TICKET-005  (GitHub Actions)
                                              │
@@ -501,17 +543,14 @@ TICKET-001  (setup) ✅
 
 ## Open Questions
 
-- [x] ~~Does Travelpayouts return round-trip prices directly?~~ — **Resolved: switched to SerpAPI.**
-      SerpAPI requires two calls (outbound → token → return + combined price).
-- [ ] Should multiple matching deals be listed in a single email, or one email per deal?
-      (Current plan: one email per run, all deals listed in a table)
-- [ ] What should happen if SerpAPI returns no data for a date pair?
-      (Current plan: log a warning, continue to next date pair / route, do not error)
-- [ ] Is there a need to track historical prices over time, or is stateless (check and alert) sufficient?
-      (Current plan: stateless — no database, no persistence between runs)
-- [ ] Date pair strategy: check fixed (depart_date, return_date) pairs, or scan all
-      (Friday, Sunday) combinations within each departure month?
-      (Recommended: scan all Fri→Sun pairs within each month for broader coverage)
+- [x] ~~Travelpayouts vs SerpAPI~~ — **Resolved: SerpAPI.**
+- [x] ~~Daily vs weekly vs bi-weekly~~ — **Resolved: bi-weekly (1st and 15th), SFO/SJC→LAS only.**
+- [x] ~~Which trip patterns~~ — **Resolved: Fri→Sun (weekend) and Fri→Mon (long weekend).**
+- [x] ~~How far ahead to scan~~ — **Resolved: 3 months rolling window from run date.**
+- [ ] Should the digest send even if no deals are below threshold, showing the cheapest
+      available regardless? (Current plan: only send if deals exist below threshold)
+- [ ] What should happen if SerpAPI returns no results for a date pair?
+      (Current plan: log a warning, continue to next pair, do not error)
 
 ---
 
@@ -527,17 +566,17 @@ TICKET-001  (setup) ✅
 
 **Key parameters:**
 
-| Parameter        | Value / Example        | Notes                                      |
-|------------------|------------------------|--------------------------------------------|
-| `engine`         | `google_flights`       | Required                                   |
-| `departure_id`   | `SFO`                  | IATA code                                  |
-| `arrival_id`     | `LAS`                  | IATA code                                  |
-| `outbound_date`  | `2026-04-10`           | YYYY-MM-DD                                 |
-| `return_date`    | `2026-04-14`           | YYYY-MM-DD                                 |
-| `type`           | `1`                    | 1 = round trip, 2 = one way                |
-| `currency`       | `USD`                  |                                            |
-| `departure_token`| `<from call 1>`        | Only on Call 2; triggers combined pricing  |
-| `api_key`        | `SERPAPI_KEY`          | From env var                               |
+| Parameter         | Value / Example   | Notes                                     |
+|-------------------|-------------------|-------------------------------------------|
+| `engine`          | `google_flights`  | Required                                  |
+| `departure_id`    | `SFO`             | IATA code                                 |
+| `arrival_id`      | `LAS`             | IATA code                                 |
+| `outbound_date`   | `2026-04-11`      | YYYY-MM-DD (a Friday)                     |
+| `return_date`     | `2026-04-13`      | YYYY-MM-DD (Sunday or Monday)             |
+| `type`            | `1`               | 1 = round trip, 2 = one way              |
+| `currency`        | `USD`             |                                           |
+| `departure_token` | `<from call 1>`   | Only on Call 2; triggers combined pricing |
+| `api_key`         | `SERPAPI_KEY`     | From env var                              |
 
 ### Resend
 
@@ -547,4 +586,4 @@ TICKET-001  (setup) ✅
 
 ---
 
-*Last updated: 2026-03-05*
+*Last updated: 2026-03-06*

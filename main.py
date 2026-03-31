@@ -51,7 +51,7 @@ def main() -> None:
                  "price": 99.0, "airline": "Southwest",
                  "link": "https://www.google.com/travel/flights"},
             ],
-            "SJC → LAS": [
+            "OAK → LAS": [
                 {"depart_date": "2026-04-09", "return_date": "2026-04-13",
                  "price": 112.0, "airline": "Frontier",
                  "link": "https://www.google.com/travel/flights"},

@@ -27,6 +27,12 @@ def main() -> None:
         action="store_true",
         help="Send a test alert with fake data; skips the SerpAPI call",
     )
+    parser.add_argument(
+        "--trial",
+        action="store_true",
+        help="Real SerpAPI call but only 1 date pair per route (~4 credits); "
+             "threshold raised to $999 so any result triggers an email",
+    )
     args = parser.parse_args()
 
     # ── Load config ────────────────────────────────────────────────────────────
@@ -66,7 +72,7 @@ def main() -> None:
         print("[TEST MODE] Done.")
         return
 
-    # ── Normal mode ────────────────────────────────────────────────────────────
+    # ── Normal / trial mode ────────────────────────────────────────────────────
     if not serpapi_key:
         sys.exit("Error: SERPAPI_KEY environment variable is not set.")
 
@@ -74,7 +80,16 @@ def main() -> None:
         scan_months_ahead=config.scan_months_ahead,
         trip_patterns=config.trip_patterns,
     )
-    print(f"Scanning {len(date_pairs)} date pairs across "
+
+    if args.trial:
+        date_pairs = date_pairs[:1]
+        effective_threshold = 999.0
+        print(f"[TRIAL] Capped to {len(date_pairs)} date pair(s), "
+              f"threshold raised to ${effective_threshold:.0f} — ~{len(date_pairs) * len(config.routes) * 2} SerpAPI call(s)")
+    else:
+        effective_threshold = config.price_threshold
+
+    print(f"Scanning {len(date_pairs)} date pair(s) across "
           f"{len(config.routes)} route(s)...")
 
     deals_by_route: dict[str, list[dict]] = {}
@@ -93,10 +108,10 @@ def main() -> None:
 
         deals = find_deals(
             flights=flights,
-            threshold=config.price_threshold,
+            threshold=effective_threshold,
             min_price=config.min_price_sanity,
         )
-        print(f"[{label}] {len(deals)} deal(s) under ${config.price_threshold:.0f}")
+        print(f"[{label}] {len(deals)} deal(s) under ${effective_threshold:.0f}")
         deals_by_route[label] = deals
 
     total_deals = sum(len(v) for v in deals_by_route.values())
@@ -110,6 +125,7 @@ def main() -> None:
         deals_by_route=deals_by_route,
         recipient_email=alert_email,
         api_key=resend_api_key,
+        test_mode=args.trial,
     )
     print("Done.")
 

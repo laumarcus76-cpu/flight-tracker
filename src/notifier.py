@@ -26,7 +26,7 @@ def send_alert(
     Send a bi-weekly flight digest email grouped by route.
 
     Args:
-        deals_by_route: dict mapping route label (e.g. "SFO → LAS") to list
+        deals_by_route: dict mapping route label (e.g. "SJC → LAS") to list
                         of deal dicts from checker.find_deals().
         recipient_email: address to send the digest to.
         api_key: Resend API key.
@@ -45,7 +45,7 @@ def send_alert(
     sender = from_address or os.environ.get("RESEND_FROM", _DEFAULT_FROM)
 
     lowest_price = min(d["price"] for d in all_deals)
-    subject = f"✈ Flight Digest: SFO/SJC → LAS — cheapest from ${lowest_price:.0f}"
+    subject = f"✈ Flight Digest: SJC/OAK → LAS — cheapest from ${lowest_price:.0f}"
     if test_mode:
         subject = f"[TEST] {subject}"
 

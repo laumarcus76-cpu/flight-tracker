@@ -1,5 +1,5 @@
 routes:
-  - origin: SFO
+  - origin: SJC
     destination: LAS
   - origin: OAK
     destination: LAS

@@ -108,7 +108,7 @@ def get_cheapest_round_trips(
       - Call 2: return search using that token; extracts the cheapest combined price
 
     Args:
-        origin: IATA code, e.g. "SFO"
+        origin: IATA code, e.g. "SJC"
         destination: IATA code, e.g. "LAS"
         date_pairs: list of ("YYYY-MM-DD", "YYYY-MM-DD") tuples
         api_key: SerpAPI key
@@ -261,6 +261,6 @@ if __name__ == "__main__":
     pairs = generate_date_pairs(3, [["Friday", "Sunday"], ["Thursday", "Monday"]])
     print(f"Generated {len(pairs)} date pairs. First 4: {pairs[:4]}\n")
 
-    print("Fetching SFO → LAS (first 2 date pairs)...")
-    results = get_cheapest_round_trips("SFO", "LAS", pairs[:2], api_key)
+    print("Fetching SJC → LAS (first 2 date pairs)...")
+    results = get_cheapest_round_trips("SJC", "LAS", pairs[:2], api_key)
     print(json.dumps(results, indent=2))

@@ -52,7 +52,7 @@ def main() -> None:
     if args.test:
         print(f"[TEST MODE] Sending test digest to {alert_email}")
         fake_deals = {
-            "SFO → LAS": [
+            "SJC → LAS": [
                 {"depart_date": "2026-04-11", "return_date": "2026-04-13",
                  "price": 99.0, "airline": "Southwest",
                  "link": "https://www.google.com/travel/flights"},

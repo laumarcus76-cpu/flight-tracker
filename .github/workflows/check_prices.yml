@@ -32,6 +32,7 @@ jobs:
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
         run: |
           if [ "${{ inputs.test_mode }}" = "true" ]; then
             python main.py --test
